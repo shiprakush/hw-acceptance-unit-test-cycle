@@ -23,7 +23,8 @@ module NavigationHelpers
       movie_path(Movie.find_by_title($1))
       
     when /^the Similar Movies page for "(.*)"$/i
-      search_directors_path(Movie.find_by_title($1))
+      #search_directors_path(Movie.find_by_title($1))
+      search_directors_path($1)
     
     # Add more mappings here.
     # Here is an example that pulls values out of the Regexp:

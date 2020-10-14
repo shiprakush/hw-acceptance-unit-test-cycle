@@ -1,79 +1,130 @@
-class MoviesController < ApplicationController
-  
-  def movie_params
-    params.require(:movie).permit(:title, :rating, :description, :release_date, :director)
-  end
+require 'rails_helper'
 
-  def show
-    id = params[:id] # retrieve movie ID from URI route
-    @movie = Movie.find(id) # look up movie by unique ID
-    # will render app/views/movies/show.<extension> by default
-  end
+#RSpec.describe MoviesController, type: :controller do
 
-  def index
-    sort = params[:sort] || session[:sort]
-    case sort
-    when 'title'
-      ordering,@title_header = {:title => :asc}, 'hilite'
-    when 'release_date'
-      ordering,@date_header = {:release_date => :asc}, 'hilite'
+#end
+#require 'rails_helper'
+
+describe MoviesController do
+  describe 'Search movies by the same director' do
+    it 'should call Movie.similar_movies' do
+      expect(Movie).to receive(:similar_movies).with('Aladdin')
+      get :search_directors, { title: 'Aladdin' }
     end
-    @all_ratings = Movie.all_ratings
-    @selected_ratings = params[:ratings] || session[:ratings] || {}
-    
-    if @selected_ratings == {}
-      @selected_ratings = Hash[@all_ratings.map {|rating| [rating, rating]}]
+
+    it 'should assign similar movies if director exists' do
+      movies = ['Seven', 'The Social Network']
+      Movie.stub(:similar_movies).with('Seven').and_return(movies)
+      get :search_directors, { title: 'Seven' }
+      expect(assigns(:similar_movies)).to eql(movies)
     end
-    
-    if params[:sort] != session[:sort] or params[:ratings] != session[:ratings]
-      session[:sort] = sort
-      session[:ratings] = @selected_ratings
-      redirect_to :sort => sort, :ratings => @selected_ratings and return
+
+    it "should redirect to home page if director isn't known" do
+      Movie.stub(:similar_movies).with('No name').and_return(nil)
+      get :search_directors, { title: 'No name' }
+      expect(response).to redirect_to(root_url)
     end
-    @movies = Movie.where(rating: @selected_ratings.keys).order(ordering)
-  end
-
-  def new
-    # default: render 'new' template
-  end
-
-  def create
-    @movie = Movie.create!(movie_params)
-    flash[:notice] = "#{@movie.title} was successfully created."
-    redirect_to movies_path
-  end
-
-  def edit
-    @movie = Movie.find params[:id]
-  end
-
-  def update
-    @movie = Movie.find params[:id]
-    @movie.update_attributes!(movie_params)
-    flash[:notice] = "#{@movie.title} was successfully updated."
-    redirect_to movie_path(@movie)
-  end
-
-  def destroy
-    @movie = Movie.find(params[:id])
-    @movie.destroy
-    flash[:notice] = "Movie '#{@movie.title}' deleted."
-    redirect_to movies_path
   end
   
-  
-  def search_directors
-    #@movie=Movie.where(director: params[:director])
-    
-    
-    @similar_movies = Movie.similar_movies(params[:title])
-    if @similar_movies.nil?
-      flash[:notice] = "'#{params[:title]}' has no director info"
-      redirect_to movies_path
-      #redirect_to root_url, alert: "'#{params[:title]}' has no director info"
+  describe 'GET index' do
+    let!(:movie) {FactoryGirl.create(:movie)}
+
+    it 'should render the index template' do
+      get :index
+      expect(response).to render_template('index')
     end
-    @movie = Movie.find_by(title: params[:title])
-    
+
+    it 'should assign instance variable for title header' do
+      get :index, { sort: 'title'}
+      expect(assigns(:title_header)).to eql('hilite')
+    end
+
+    it 'should assign instance variable for release_date header' do
+      get :index, { sort: 'release_date'}
+      expect(assigns(:date_header)).to eql('hilite')
+    end
   end
 
+  describe 'GET new' do
+    let!(:movie) { Movie.new }
+
+    it 'should render the new template' do
+      get :new
+      expect(response).to render_template('new')
+    end
+  end
+
+  describe 'POST #create' do
+    it 'creates a new movie' do
+      expect {post :create, movie: FactoryGirl.attributes_for(:movie)
+      }.to change { Movie.count }.by(1)
+    end
+
+    it 'redirects to the movie index page' do
+      post :create, movie: FactoryGirl.attributes_for(:movie)
+      expect(response).to redirect_to(movies_url)
+    end
+  end
+
+  describe 'GET #show' do
+    let!(:movie) { FactoryGirl.create(:movie) }
+    before(:each) do
+      get :show, id: movie.id
+    end
+
+    it 'should find the movie' do
+      expect(assigns(:movie)).to eql(movie)
+    end
+
+    it 'should render the show template' do
+      expect(response).to render_template('show')
+    end
+  end
+
+  describe 'GET #edit' do
+    let!(:movie) { FactoryGirl.create(:movie) }
+    before do
+      get :edit, id: movie.id
+    end
+
+    it 'should find the movie' do
+      expect(assigns(:movie)).to eql(movie)
+    end
+
+    it 'should render the edit template' do
+      expect(response).to render_template('edit')
+    end
+  end
+
+  describe 'PUT #update' do
+    let(:movie1) { FactoryGirl.create(:movie) }
+    before(:each) do
+      put :update, id: movie1.id, movie: FactoryGirl.attributes_for(:movie, title: 'Modified')
+    end
+
+    it 'updates an existing movie' do
+      movie1.reload
+      expect(movie1.title).to eql('Modified')
+    end
+
+    it 'redirects to the movie page' do
+      expect(response).to redirect_to(movie_path(movie1))
+    end
+  end
+
+  describe 'DELETE #destroy' do
+    let!(:movie1) { FactoryGirl.create(:movie) }
+
+    it 'destroys a movie' do
+      expect { delete :destroy, id: movie1.id
+      }.to change(Movie, :count).by(-1)
+    end
+
+    it 'redirects to movies#index after destroy' do
+      delete :destroy, id: movie1.id
+      expect(response).to redirect_to(movies_path)
+    end
+  end
+
+  
 end
