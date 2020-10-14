@@ -3,3 +3,4 @@ class AddDirectorToMovies < ActiveRecord::Migration
   	add_column :movies, :director, :string
   end
 end
+
